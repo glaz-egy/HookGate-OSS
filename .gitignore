@@ -1,12 +1,40 @@
+# Dependencies
 node_modules/
-.next/
-.wrangler/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
 .dev.vars
-.env.local
-.env*.local
+*.local
+
+# Next.js
+.next/
+out/
+
+# Cloudflare / Wrangler
+.wrangler/
+
+# Supabase local state
 supabase/.branches/
 supabase/.temp/
+
+# Build and test output
 dist/
+build/
 coverage/
-*.log
 *.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
