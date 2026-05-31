@@ -2,6 +2,14 @@ name = "hookgate-oss-api"
 main = "src/worker/index.js"
 compatibility_date = "2026-05-31"
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+
+
 [[queues.producers]]
 queue = "hookgate-deliveries"
 binding = "WEBHOOK_QUEUE"

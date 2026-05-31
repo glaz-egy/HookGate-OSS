@@ -48,9 +48,8 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           WEBHOOK_URL_ENCRYPTION_KEY: ${{ secrets.WEBHOOK_URL_ENCRYPTION_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_SECRET: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_VAR: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |
           required_secrets=(
             CLOUDFLARE_ACCOUNT_ID
@@ -58,11 +57,6 @@ jobs:
             SUPABASE_URL
             SUPABASE_SERVICE_ROLE_KEY
             WEBHOOK_URL_ENCRYPTION_KEY
-          )
-          required_variables=(
-            NEXT_PUBLIC_SUPABASE_URL
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-            NEXT_PUBLIC_HOOKGATE_API_URL
           )
 
           missing=0
@@ -72,48 +66,128 @@ jobs:
               missing=1
             fi
           done
-          for key in "${required_variables[@]}"; do
-            if [ -z "${!key}" ]; then
-              echo "::error::$key must be configured as a production environment variable."
-              missing=1
-            fi
-          done
+          if [ -z "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_SECRET" ] && [ -z "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_VAR" ]; then
+            echo "::error::NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY must be configured as a production environment secret or variable."
+            missing=1
+          fi
 
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
 
-      - name: Create Worker secrets file
+      - name: Resolve deployment config
         env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           WEBHOOK_URL_ENCRYPTION_KEY: ${{ secrets.WEBHOOK_URL_ENCRYPTION_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_SECRET: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_VAR: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          node -e '
+          node <<'NODE'
           const fs = require("node:fs");
-          const secrets = {
-            SUPABASE_URL: process.env.SUPABASE_URL,
-            SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-            WEBHOOK_URL_ENCRYPTION_KEY: process.env.WEBHOOK_URL_ENCRYPTION_KEY
+          const read = (path) => fs.readFileSync(path, "utf8");
+          const requireTomlString = (source, key, file) => {
+            const match = source.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]+)"`, "m"));
+            if (!match) throw new Error(`${key} is missing in ${file}.`);
+            return match[1];
           };
-          fs.writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify(secrets));
-          '
+          const stripJsonComments = (source) => {
+            let result = "";
+            let inString = false;
+            let quote = "";
+            let escaped = false;
+            for (let i = 0; i < source.length; i++) {
+              const char = source[i];
+              const next = source[i + 1];
+              if (inString) {
+                result += char;
+                if (escaped) {
+                  escaped = false;
+                } else if (char === "\\\\") {
+                  escaped = true;
+                } else if (char === quote) {
+                  inString = false;
+                }
+                continue;
+              }
+              if (char === "\"" || char === "'") {
+                inString = true;
+                quote = char;
+                result += char;
+                continue;
+              }
+              if (char === "/" && next === "/") {
+                while (i < source.length && source[i] !== "\n") i++;
+                result += "\n";
+                continue;
+              }
+              if (char === "/" && next === "*") {
+                i += 2;
+                while (i < source.length && !(source[i] === "*" && source[i + 1] === "/")) i++;
+                i++;
+                continue;
+              }
+              result += char;
+            }
+            return result;
+          };
 
-      - name: Create Web environment file
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
-        run: |
-          node -e '
-          const fs = require("node:fs");
-          const env = [
-            `NEXT_PUBLIC_SUPABASE_URL=${process.env.NEXT_PUBLIC_SUPABASE_URL}`,
-            `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}`,
-            `NEXT_PUBLIC_HOOKGATE_API_URL=${process.env.NEXT_PUBLIC_HOOKGATE_API_URL}`
-          ].join("\n") + "\n";
-          fs.writeFileSync(process.env.RUNNER_TEMP + "/web.env", env);
-          '
+          (async () => {
+            const apiConfigFile = "apps/api/wrangler.toml";
+            const webConfigFile = "apps/web/wrangler.jsonc";
+            const apiConfig = read(apiConfigFile);
+            const webConfig = JSON.parse(stripJsonComments(read(webConfigFile)));
+            const apiWorkerName = requireTomlString(apiConfig, "name", apiConfigFile);
+            const queueName = requireTomlString(apiConfig, "queue", apiConfigFile);
+            const webWorkerName = webConfig.name;
+            if (!webWorkerName) throw new Error(`name is missing in ${webConfigFile}.`);
+
+            const subdomainResponse = await fetch(
+              `https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/workers/subdomain`,
+              { headers: { authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}` } }
+            );
+            const subdomainPayload = await subdomainResponse.json();
+            if (!subdomainResponse.ok || !subdomainPayload.success || !subdomainPayload.result?.subdomain) {
+              throw new Error(`Unable to resolve Cloudflare workers.dev subdomain: ${JSON.stringify(subdomainPayload)}`);
+            }
+
+            const publicSupabaseKey =
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_SECRET ||
+              process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY_VAR;
+            const publicApiUrl = `https://${apiWorkerName}.${subdomainPayload.result.subdomain}.workers.dev`;
+
+            webConfig.vars = {
+              ...(webConfig.vars || {}),
+              NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL,
+              NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publicSupabaseKey,
+              NEXT_PUBLIC_SUPABASE_ANON_KEY: publicSupabaseKey,
+              NEXT_PUBLIC_HOOKGATE_API_URL: publicApiUrl
+            };
+
+            const secrets = {
+              SUPABASE_URL: process.env.SUPABASE_URL,
+              SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+              WEBHOOK_URL_ENCRYPTION_KEY: process.env.WEBHOOK_URL_ENCRYPTION_KEY
+            };
+
+            fs.writeFileSync(`${process.env.RUNNER_TEMP}/worker-secrets.json`, JSON.stringify(secrets));
+            fs.writeFileSync("apps/web/wrangler.generated.jsonc", `${JSON.stringify(webConfig, null, 2)}\n`);
+            fs.appendFileSync(process.env.GITHUB_ENV, [
+              `API_WORKER_NAME=${apiWorkerName}`,
+              `WEB_WORKER_NAME=${webWorkerName}`,
+              `QUEUE_NAME=${queueName}`,
+              `NEXT_PUBLIC_SUPABASE_URL=${process.env.SUPABASE_URL}`,
+              `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${publicSupabaseKey}`,
+              `NEXT_PUBLIC_SUPABASE_ANON_KEY=${publicSupabaseKey}`,
+              `NEXT_PUBLIC_HOOKGATE_API_URL=${publicApiUrl}`
+            ].join("\n") + "\n");
+          })().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          NODE
 
       - name: Ensure Cloudflare Queue
         env:
@@ -121,8 +195,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           queues="$(npx wrangler queues list --cwd apps/api)"
-          if ! printf "%s\n" "$queues" | grep -F "hookgate-deliveries" >/dev/null; then
-            npx wrangler queues create hookgate-deliveries --cwd apps/api
+          if ! printf "%s\n" "$queues" | grep -F "$QUEUE_NAME" >/dev/null; then
+            npx wrangler queues create "$QUEUE_NAME" --cwd apps/api
           fi
 
       - name: Upload Worker secrets
@@ -140,10 +214,6 @@ jobs:
           command: deploy --secrets-file "${{ runner.temp }}/worker-secrets.json"
 
       - name: Build Web Worker
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
-          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
         run: npm run build:cloudflare -w apps/web
 
       - name: Deploy Web Worker
@@ -152,4 +222,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/web
-          command: deploy --env-file "${{ runner.temp }}/web.env"
+          command: deploy --config wrangler.generated.jsonc

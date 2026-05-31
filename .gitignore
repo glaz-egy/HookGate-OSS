@@ -16,6 +16,7 @@ out/
 
 # Cloudflare / Wrangler
 .wrangler/
+wrangler.generated.jsonc
 
 # Supabase local state
 supabase/.branches/
