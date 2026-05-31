@@ -21,6 +21,12 @@ export async function sha256Hex(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+export function createPlainApiKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  const token = [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  return `hg_${token}`;
+}
+
 export function timingSafeEqual(a, b) {
   if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) {
     return false;

@@ -1,0 +1,17 @@
+{
+  "name": "@hookgate/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local --port 8787",
+    "test": "node --test",
+    "check": "node --check src/worker/index.js && node --check src/worker/queue.js && node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2"
+  }
+}

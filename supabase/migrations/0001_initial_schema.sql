@@ -95,6 +95,7 @@ create table public.webhook_logs (
   retry_count integer not null default 0,
   source_ip inet,
   request_summary jsonb not null default '{}'::jsonb,
+  request_payload jsonb,
   response_summary jsonb not null default '{}'::jsonb,
   error_message text,
   idempotency_key text,

@@ -6,26 +6,25 @@ This repository is the OSS implementation track. Billing, Stripe, plan enforceme
 
 ## Current Scope
 
-- Cloudflare Workers API for `POST /api/v1/hooks/:endpoint_id`
+- Next.js frontend under `apps/web`
+- Cloudflare Workers API under `apps/api` for `POST /api/v1/hooks/:endpoint_id`
 - Cloudflare Queues producer and consumer
+- Supabase Auth protected management console
 - Discord and Slack outgoing webhook adapters
 - API key lookup with hashed key verification
 - Payload validation, size limits, idempotency checks, and basic rate limiting hooks
 - Secret-safe logging helpers
-- Static Cloudflare Pages compatible management UI shell
+- Next.js management UI shell with Supabase Auth
 - Supabase PostgreSQL schema with RLS enabled
 - Documentation under `Docs/`
 
 ## Repository Layout
 
 ```text
-Docs/                  Requirements and implementation tracking
-public/                Static management UI shell
-src/adapters/          Destination-specific payload adapters
-src/lib/               Shared validation, crypto, database, and security helpers
-src/worker/            Cloudflare Worker entrypoints
+apps/api/              Cloudflare Workers API and Queue consumer
+apps/web/              Next.js frontend with Supabase Auth
+Docs/                  Requirements, status, and local setup docs
 supabase/migrations/   Supabase schema migrations
-test/                  Node test suite
 ```
 
 ## Local Checks
@@ -33,21 +32,41 @@ test/                  Node test suite
 ```bash
 npm test
 npm run check
+npm run build:web
 ```
 
-No install step is required for the current test suite.
+See `Docs/local-development.md` for local Supabase, Next.js, and Worker setup.
+
+## CI/CD
+
+- `.github/workflows/deploy-cloudflare.yml` verifies and deploys `apps/api` to Cloudflare Workers on `main` pushes that touch the API, and can also be run manually.
+- `.github/workflows/supabase-migrations.yml` starts a local Supabase database and runs `supabase db reset` so committed migrations are verified from a clean state.
+
+Required GitHub repository secrets for Cloudflare deployment:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+Set Worker runtime secrets separately with Wrangler before relying on a production deployment:
+
+```bash
+cd apps/api
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put WEBHOOK_URL_ENCRYPTION_KEY
+```
 
 ## Deployment Notes
 
-1. Create a Supabase project and apply `supabase/migrations/0001_initial_schema.sql`.
+1. Create a Supabase project and apply all SQL files under `supabase/migrations`.
 2. Create a Cloudflare Queue named `hookgate-deliveries`.
 3. Configure Worker environment variables:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `WEBHOOK_URL_ENCRYPTION_KEY`
 4. Bind the queue as `WEBHOOK_QUEUE`.
-5. Deploy `src/worker/index.js` as the API Worker and `src/worker/queue.js` as the queue consumer.
-6. Deploy `public/` with Cloudflare Pages for the management UI shell.
+5. Deploy `apps/api/src/worker/index.js` as the API Worker and `apps/api/src/worker/queue.js` as the queue consumer.
+6. Deploy `apps/web` as the Next.js frontend.
 
 ## Security Defaults
 

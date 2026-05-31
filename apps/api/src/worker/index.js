@@ -1,28 +1,47 @@
 import { createSupabaseClient } from "../lib/db.js";
 import { decryptString } from "../lib/crypto.js";
-import { errorResponse, getClientIp, jsonResponse } from "../lib/http.js";
+import { corsPreflightResponse, errorResponse, getClientIp, jsonResponse, withCors } from "../lib/http.js";
 import { createRequestId } from "../lib/ids.js";
 import { extractApiKey, redactForLog, sha256Hex, timingSafeEqual } from "../lib/security.js";
 import { readJsonWithLimit, validateIncomingPayload } from "../lib/validation.js";
+import { handleManagement, managementErrorResponse } from "./management.js";
+import queueWorker from "./queue.js";
 
 export default {
+  async queue(batch, env) {
+    return queueWorker.queue(batch, env);
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return corsPreflightResponse();
+    }
+
     if (request.method === "GET" && url.pathname === "/health") {
-      return jsonResponse({ ok: true, service: "hookgate-oss" });
+      return withCors(jsonResponse({ ok: true, service: "hookgate-oss" }));
+    }
+
+    if (url.pathname.startsWith("/api/v1/management")) {
+      try {
+        return withCors(await handleManagement(request, env, ctx, createSupabaseClient(env)));
+      } catch (error) {
+        console.error("Unhandled management error", redactForLog({ message: error.message }));
+        return withCors(managementErrorResponse(error));
+      }
     }
 
     const match = url.pathname.match(/^\/api\/v1\/hooks\/([^/]+)$/);
     if (request.method !== "POST" || !match) {
-      return errorResponse(404, "ENDPOINT_NOT_FOUND", "Endpoint not found.");
+      return withCors(errorResponse(404, "ENDPOINT_NOT_FOUND", "Endpoint not found."));
     }
 
     try {
-      return await handleWebhook(request, env, ctx, match[1]);
+      return withCors(await handleWebhook(request, env, ctx, match[1]));
     } catch (error) {
       console.error("Unhandled receive error", redactForLog({ message: error.message }));
-      return errorResponse(500, "INTERNAL_ERROR", "Internal error.");
+      return withCors(errorResponse(500, "INTERNAL_ERROR", "Internal error."));
     }
   }
 };
@@ -83,6 +102,7 @@ export async function handleWebhook(request, env, ctx, endpointId) {
     service_type: endpoint.service_type,
     source_ip: sourceIpForDb,
     request_summary: summarizePayload(validation.value),
+    request_payload: validation.value,
     queued_at: now,
     created_at: now,
     idempotency_key: validation.value.idempotency_key || null

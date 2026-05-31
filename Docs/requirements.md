@@ -17,7 +17,7 @@ Primary goals:
 
 ## 2. Architecture
 
-- Frontend: Cloudflare Pages static management UI
+- Frontend: Next.js application deployed separately from the API
 - API: Cloudflare Workers
 - Queue: Cloudflare Queues
 - Auth: Supabase Auth
@@ -164,12 +164,21 @@ Retryable failures:
 
 Default max retries: 3.
 
+Resend behavior:
+
+- Failed or historical delivery logs can be queued again from the management UI.
+- Resend creates a new `request_id` and log row.
+- Resend requires the original normalized payload to be available in `webhook_logs.request_payload`.
+- Resend writes an audit-log entry linking the original and new request IDs.
+
 ## 9. Security
 
 Required controls:
 
 - API key hashing
 - Webhook URL encryption
+- Drizzle-backed table schema definitions in backend code
+- Whitelisted DB query construction for management API filters, columns, and operators
 - HTTPS-only destination URLs
 - Discord/Slack URL allowlisting in the initial release
 - Secret-safe logging
