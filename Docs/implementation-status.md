@@ -31,6 +31,9 @@ Last updated: 2026-05-31
 - Delivery log resend API and UI action.
 - Drizzle schema definitions for backend database tables.
 - Management DB access now uses a whitelisted REST query builder to avoid raw query-string composition from user input.
+- Cloudflare Worker deployment workflow for `main` and manual dispatch.
+- Supabase migration verification workflow that resets a local database from committed migrations.
+- Supabase CLI config for local and CI migration verification.
 
 ## Remaining Tasks
 
@@ -39,8 +42,6 @@ Last updated: 2026-05-31
 - Add delivery retry scheduling that honors `Retry-After`.
 - Add IP allowlist enforcement.
 - Add local integration test harness for Worker fetch and Queue consumer.
-- Add Cloudflare deployment workflow.
-- Add Supabase migration verification workflow.
 - Add Teams, Google Chat, and Generic HTTP adapters after SSRF guard is complete.
 
 ## Explicit OSS Decisions

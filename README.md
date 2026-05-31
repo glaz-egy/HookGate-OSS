@@ -32,13 +32,33 @@ supabase/migrations/   Supabase schema migrations
 ```bash
 npm test
 npm run check
+npm run build:web
 ```
 
 See `Docs/local-development.md` for local Supabase, Next.js, and Worker setup.
 
+## CI/CD
+
+- `.github/workflows/deploy-cloudflare.yml` verifies and deploys `apps/api` to Cloudflare Workers on `main` pushes that touch the API, and can also be run manually.
+- `.github/workflows/supabase-migrations.yml` starts a local Supabase database and runs `supabase db reset` so committed migrations are verified from a clean state.
+
+Required GitHub repository secrets for Cloudflare deployment:
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+Set Worker runtime secrets separately with Wrangler before relying on a production deployment:
+
+```bash
+cd apps/api
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put WEBHOOK_URL_ENCRYPTION_KEY
+```
+
 ## Deployment Notes
 
-1. Create a Supabase project and apply `supabase/migrations/0001_initial_schema.sql`.
+1. Create a Supabase project and apply all SQL files under `supabase/migrations`.
 2. Create a Cloudflare Queue named `hookgate-deliveries`.
 3. Configure Worker environment variables:
    - `SUPABASE_URL`
