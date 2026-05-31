@@ -1,0 +1,23 @@
+{
+  "name": "hookgate-oss",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "OSS webhook proxy for safely relaying events to Discord and Slack through Cloudflare Workers.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/worker/index.js && node --check src/worker/queue.js && node --test"
+  },
+  "keywords": [
+    "webhook",
+    "proxy",
+    "cloudflare-workers",
+    "discord",
+    "slack",
+    "supabase"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

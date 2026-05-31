@@ -1,0 +1,12 @@
+name = "hookgate-oss-api"
+main = "src/worker/index.js"
+compatibility_date = "2026-05-31"
+
+[[queues.producers]]
+queue = "hookgate-deliveries"
+binding = "WEBHOOK_QUEUE"
+
+[[queues.consumers]]
+queue = "hookgate-deliveries"
+max_batch_size = 10
+max_batch_timeout = 5

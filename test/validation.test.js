@@ -1,0 +1,27 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { validateIncomingPayload } from "../src/lib/validation.js";
+
+test("message is required", () => {
+  const result = validateIncomingPayload({});
+  assert.equal(result.ok, false);
+  assert.equal(result.message, "message is required.");
+});
+
+test("valid payload is normalized", () => {
+  const result = validateIncomingPayload({
+    message: " hello ",
+    fields: [{ name: "a", value: "b" }]
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.message, "hello");
+  assert.equal(result.value.level, "info");
+});
+
+test("too many fields fails validation", () => {
+  const result = validateIncomingPayload({
+    message: "hello",
+    fields: Array.from({ length: 26 }, (_, index) => ({ name: String(index), value: "x" }))
+  });
+  assert.equal(result.ok, false);
+});
