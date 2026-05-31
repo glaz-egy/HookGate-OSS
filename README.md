@@ -42,7 +42,7 @@ See `Docs/local-development.md` for local Supabase, Next.js, and Worker setup.
 - `.github/workflows/deploy-cloudflare.yml` verifies the API, deploys the API Worker, builds the Next.js app with OpenNext, and deploys the Web Worker.
 - Supabase migrations are kept in `supabase/migrations`; verify them locally with `supabase db reset` when schema changes are made.
 
-Required GitHub repository secrets for Cloudflare deployment:
+Required GitHub `production` environment secrets for Cloudflare deployment:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
@@ -50,18 +50,18 @@ Required GitHub repository secrets for Cloudflare deployment:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WEBHOOK_URL_ENCRYPTION_KEY`
 
-Required GitHub repository variables for Cloudflare deployment:
+Required GitHub `production` environment variables for Cloudflare deployment:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_HOOKGATE_API_URL`
 
-The workflow creates the `hookgate-deliveries` queue if needed, uploads API Worker secrets from GitHub repository secrets, then deploys `hookgate-oss-api` and `hookgate-oss-web`. If any required secret or variable is missing, the workflow fails before mutating Cloudflare state.
+The workflow uses the GitHub `production` environment, creates the `hookgate-deliveries` queue if needed, uploads API Worker secrets from production environment secrets, then deploys `hookgate-oss-api` and `hookgate-oss-web`. If any required production environment secret or variable is missing, the workflow fails before mutating Cloudflare state.
 
 ## Deployment Notes
 
 1. Create a Supabase project and apply all SQL files under `supabase/migrations`.
-2. Configure GitHub repository secrets for Cloudflare deployment.
+2. Configure GitHub `production` environment secrets and variables for Cloudflare deployment.
 3. Configure Worker environment variables:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`

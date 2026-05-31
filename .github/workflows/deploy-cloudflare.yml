@@ -21,6 +21,7 @@ jobs:
     name: Deploy Workers
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    environment: production
     permissions:
       contents: read
 
@@ -67,13 +68,13 @@ jobs:
           missing=0
           for key in "${required_secrets[@]}"; do
             if [ -z "${!key}" ]; then
-              echo "::error::$key must be configured as a repository secret."
+              echo "::error::$key must be configured as a production environment secret."
               missing=1
             fi
           done
           for key in "${required_variables[@]}"; do
             if [ -z "${!key}" ]; then
-              echo "::error::$key must be configured as a repository variable."
+              echo "::error::$key must be configured as a production environment variable."
               missing=1
             fi
           done
