@@ -129,3 +129,17 @@ npm run build:web
 ```
 
 `npm run check` runs API syntax/tests and frontend TypeScript checks.
+
+## 8. Management API Smoke Test
+
+After `supabase start`, `supabase db reset`, `npm run dev:api`, and `npm run dev:web`, the dashboard can manage:
+
+- Organizations
+- Projects
+- Endpoints
+- API keys
+- Endpoint query-string API key support
+- Delivery logs
+- Log resend
+
+The API requires a Supabase Auth bearer token for all `/api/v1/management/*` routes.

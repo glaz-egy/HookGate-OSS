@@ -164,6 +164,13 @@ Retryable failures:
 
 Default max retries: 3.
 
+Resend behavior:
+
+- Failed or historical delivery logs can be queued again from the management UI.
+- Resend creates a new `request_id` and log row.
+- Resend requires the original normalized payload to be available in `webhook_logs.request_payload`.
+- Resend writes an audit-log entry linking the original and new request IDs.
+
 ## 9. Security
 
 Required controls:

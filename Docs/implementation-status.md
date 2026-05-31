@@ -23,15 +23,15 @@ Last updated: 2026-05-31
 - Next.js frontend scaffold with App Router.
 - Supabase Auth login, signup, callback, session middleware, and protected dashboard.
 - Local development guide in `Docs/local-development.md`.
+- Authenticated Worker management API for organizations, projects, endpoints, API keys, logs, and resend.
+- Frontend CRUD screens connected to the Worker management API.
+- API key rotation/creation flow that returns plaintext only once.
+- Endpoint-level query-string API key toggle in API and UI.
+- Audit-log writes for organization, project, endpoint, API key, and resend management operations.
+- Delivery log resend API and UI action.
 
 ## Remaining Tasks
 
-- Connect endpoint CRUD screens to API endpoints.
-- Add CRUD management APIs for organizations, projects, endpoints, and API keys.
-- Add API key creation flow that shows plaintext only once.
-- Add endpoint-level query-string API key toggle in UI/API.
-- Add full audit-log writes for all management operations.
-- Add resend API and UI.
 - Add real rate-limit backend storage.
 - Add idempotency persistence and replay response behavior.
 - Add delivery retry scheduling that honors `Retry-After`.
