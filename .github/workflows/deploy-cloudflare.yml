@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "apps/api/**"
+      - "apps/web/**"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/deploy-cloudflare.yml"
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy API Worker
+    name: Deploy Workers
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -30,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -39,10 +40,115 @@ jobs:
       - name: Verify API
         run: npm run check -w apps/api
 
-      - name: Deploy Worker
+      - name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WEBHOOK_URL_ENCRYPTION_KEY: ${{ secrets.WEBHOOK_URL_ENCRYPTION_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
+        run: |
+          required_secrets=(
+            CLOUDFLARE_ACCOUNT_ID
+            CLOUDFLARE_API_TOKEN
+            SUPABASE_URL
+            SUPABASE_SERVICE_ROLE_KEY
+            WEBHOOK_URL_ENCRYPTION_KEY
+          )
+          required_variables=(
+            NEXT_PUBLIC_SUPABASE_URL
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            NEXT_PUBLIC_HOOKGATE_API_URL
+          )
+
+          missing=0
+          for key in "${required_secrets[@]}"; do
+            if [ -z "${!key}" ]; then
+              echo "::error::$key must be configured as a repository secret."
+              missing=1
+            fi
+          done
+          for key in "${required_variables[@]}"; do
+            if [ -z "${!key}" ]; then
+              echo "::error::$key must be configured as a repository variable."
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Create Worker secrets file
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          WEBHOOK_URL_ENCRYPTION_KEY: ${{ secrets.WEBHOOK_URL_ENCRYPTION_KEY }}
+        run: |
+          node -e '
+          const fs = require("node:fs");
+          const secrets = {
+            SUPABASE_URL: process.env.SUPABASE_URL,
+            SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+            WEBHOOK_URL_ENCRYPTION_KEY: process.env.WEBHOOK_URL_ENCRYPTION_KEY
+          };
+          fs.writeFileSync(process.env.RUNNER_TEMP + "/worker-secrets.json", JSON.stringify(secrets));
+          '
+
+      - name: Create Web environment file
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
+        run: |
+          node -e '
+          const fs = require("node:fs");
+          const env = [
+            `NEXT_PUBLIC_SUPABASE_URL=${process.env.NEXT_PUBLIC_SUPABASE_URL}`,
+            `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}`,
+            `NEXT_PUBLIC_HOOKGATE_API_URL=${process.env.NEXT_PUBLIC_HOOKGATE_API_URL}`
+          ].join("\n") + "\n";
+          fs.writeFileSync(process.env.RUNNER_TEMP + "/web.env", env);
+          '
+
+      - name: Ensure Cloudflare Queue
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          queues="$(npx wrangler queues list --cwd apps/api)"
+          if ! printf "%s\n" "$queues" | grep -F "hookgate-deliveries" >/dev/null; then
+            npx wrangler queues create hookgate-deliveries --cwd apps/api
+          fi
+
+      - name: Upload Worker secrets
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler secret bulk "$RUNNER_TEMP/worker-secrets.json" --cwd apps/api
+
+      - name: Deploy API Worker
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          command: deploy
+          command: deploy --secrets-file "${{ runner.temp }}/worker-secrets.json"
+
+      - name: Build Web Worker
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_HOOKGATE_API_URL: ${{ vars.NEXT_PUBLIC_HOOKGATE_API_URL }}
+        run: npm run build:cloudflare -w apps/web
+
+      - name: Deploy Web Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/web
+          command: deploy --env-file "${{ runner.temp }}/web.env"

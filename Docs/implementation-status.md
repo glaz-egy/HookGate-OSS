@@ -32,8 +32,8 @@ Last updated: 2026-05-31
 - Drizzle schema definitions for backend database tables.
 - Management DB access now uses a whitelisted REST query builder to avoid raw query-string composition from user input.
 - Cloudflare Worker deployment workflow for `main` and manual dispatch.
-- Supabase migration verification workflow that resets a local database from committed migrations.
-- Supabase CLI config for local and CI migration verification.
+- Cloudflare Workers deployment path for the Next.js frontend using OpenNext.
+- Supabase CLI config for local migration verification.
 
 ## Remaining Tasks
 

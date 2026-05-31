@@ -39,34 +39,36 @@ See `Docs/local-development.md` for local Supabase, Next.js, and Worker setup.
 
 ## CI/CD
 
-- `.github/workflows/deploy-cloudflare.yml` verifies and deploys `apps/api` to Cloudflare Workers on `main` pushes that touch the API, and can also be run manually.
-- `.github/workflows/supabase-migrations.yml` starts a local Supabase database and runs `supabase db reset` so committed migrations are verified from a clean state.
+- `.github/workflows/deploy-cloudflare.yml` verifies the API, deploys the API Worker, builds the Next.js app with OpenNext, and deploys the Web Worker.
+- Supabase migrations are kept in `supabase/migrations`; verify them locally with `supabase db reset` when schema changes are made.
 
 Required GitHub repository secrets for Cloudflare deployment:
 
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `WEBHOOK_URL_ENCRYPTION_KEY`
 
-Set Worker runtime secrets separately with Wrangler before relying on a production deployment:
+Required GitHub repository variables for Cloudflare deployment:
 
-```bash
-cd apps/api
-npx wrangler secret put SUPABASE_URL
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-npx wrangler secret put WEBHOOK_URL_ENCRYPTION_KEY
-```
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_HOOKGATE_API_URL`
+
+The workflow creates the `hookgate-deliveries` queue if needed, uploads API Worker secrets from GitHub repository secrets, then deploys `hookgate-oss-api` and `hookgate-oss-web`. If any required secret or variable is missing, the workflow fails before mutating Cloudflare state.
 
 ## Deployment Notes
 
 1. Create a Supabase project and apply all SQL files under `supabase/migrations`.
-2. Create a Cloudflare Queue named `hookgate-deliveries`.
+2. Configure GitHub repository secrets for Cloudflare deployment.
 3. Configure Worker environment variables:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `WEBHOOK_URL_ENCRYPTION_KEY`
 4. Bind the queue as `WEBHOOK_QUEUE`.
 5. Deploy `apps/api/src/worker/index.js` as the API Worker and `apps/api/src/worker/queue.js` as the queue consumer.
-6. Deploy `apps/web` as the Next.js frontend.
+6. Deploy `apps/web` as the Next.js frontend through OpenNext on Cloudflare Workers.
 
 ## Security Defaults
 
