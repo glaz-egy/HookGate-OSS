@@ -159,8 +159,7 @@ export function DashboardClient() {
       const result = await apiFetch<{ organization: Organization }>("/api/v1/management/organizations", {
         method: "POST",
         body: JSON.stringify({
-          name: formData.get("name"),
-          slug: formData.get("slug")
+          name: formData.get("name")
         })
       });
       await refresh(result.organization.id, "");
@@ -174,7 +173,6 @@ export function DashboardClient() {
         method: "PATCH",
         body: JSON.stringify({
           name: formData.get("name"),
-          slug: formData.get("slug"),
           is_enabled: formData.get("is_enabled") === "on"
         })
       });
@@ -197,8 +195,7 @@ export function DashboardClient() {
         method: "POST",
         body: JSON.stringify({
           organization_id: selectedOrgId,
-          name: formData.get("name"),
-          slug: formData.get("slug")
+          name: formData.get("name")
         })
       });
       await refresh(selectedOrgId, result.project.id);
@@ -211,7 +208,6 @@ export function DashboardClient() {
         method: "PATCH",
         body: JSON.stringify({
           name: formData.get("name"),
-          slug: formData.get("slug"),
           is_enabled: formData.get("is_enabled") === "on"
         })
       });
@@ -367,7 +363,6 @@ export function DashboardClient() {
           <div className="panel-body">
             <form className="compact-form" action={createOrganization}>
               <input name="name" placeholder="Organization name" required />
-              <input name="slug" placeholder="slug" />
               <button type="submit" disabled={isPending}>Add</button>
             </form>
 
@@ -386,7 +381,7 @@ export function DashboardClient() {
             {selectedOrg ? (
               <form className="edit-form" action={updateOrganization}>
                 <input name="name" defaultValue={selectedOrg.name} required />
-                <input name="slug" defaultValue={selectedOrg.slug} required />
+                <p className="muted">Slug: {selectedOrg.slug}</p>
                 <label className="check-row">
                   <input type="checkbox" name="is_enabled" defaultChecked={selectedOrg.is_enabled} />
                   Enabled
@@ -410,7 +405,6 @@ export function DashboardClient() {
           <div className="panel-body">
             <form className="compact-form" action={createProject}>
               <input name="name" placeholder="Project name" required disabled={!selectedOrgId} />
-              <input name="slug" placeholder="slug" disabled={!selectedOrgId} />
               <button type="submit" disabled={isPending || !selectedOrgId}>Add</button>
             </form>
             <label className="field">
@@ -429,7 +423,7 @@ export function DashboardClient() {
               {data.projects.map((project) => (
                 <form key={project.id} className="edit-form" action={(formData) => updateProject(project, formData)}>
                   <input name="name" defaultValue={project.name} required />
-                  <input name="slug" defaultValue={project.slug} required />
+                  <p className="muted">Slug: {project.slug}</p>
                   <label className="check-row">
                     <input type="checkbox" name="is_enabled" defaultChecked={project.is_enabled} />
                     Enabled

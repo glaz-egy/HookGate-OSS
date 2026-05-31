@@ -66,7 +66,7 @@ async function handleOrganizations(request, db, user, parts) {
   if (request.method === "POST" && parts.length === 1) {
     const body = await readBody(request);
     const name = requireString(body.name, "name");
-    const slug = slugify(body.slug || name);
+    const slug = slugify(name);
     const organization = await db.insert("organizations", {
       name,
       slug,
@@ -93,9 +93,10 @@ async function handleOrganizations(request, db, user, parts) {
     await requireRole(db, organizationId, user.id, ["owner", "admin"]);
     const before = await getOrganization(db, organizationId);
     const body = await readBody(request);
+    const name = optionalString(body.name);
     const patch = compact({
-      name: optionalString(body.name),
-      slug: body.slug ? slugify(body.slug) : undefined,
+      name,
+      slug: name ? slugify(name) : undefined,
       is_enabled: optionalBoolean(body.is_enabled),
       updated_at: new Date().toISOString()
     });
@@ -134,7 +135,7 @@ async function handleProjects(request, db, user, parts, url) {
     const project = await db.insert("projects", {
       organization_id: organizationId,
       name,
-      slug: slugify(body.slug || name),
+      slug: slugify(name),
       created_by: user.id
     });
     await audit(db, request, user, organizationId, "project.created", "project", project.id, null, summarizeProject(project));
@@ -150,9 +151,10 @@ async function handleProjects(request, db, user, parts, url) {
   if (request.method === "PATCH" && parts.length === 2) {
     await requireRole(db, project.organization_id, user.id, ["owner", "admin", "developer"]);
     const body = await readBody(request);
+    const name = optionalString(body.name);
     const patch = compact({
-      name: optionalString(body.name),
-      slug: body.slug ? slugify(body.slug) : undefined,
+      name,
+      slug: name ? slugify(name) : undefined,
       is_enabled: optionalBoolean(body.is_enabled),
       updated_at: new Date().toISOString()
     });
