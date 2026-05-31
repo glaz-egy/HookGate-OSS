@@ -17,7 +17,7 @@ Primary goals:
 
 ## 2. Architecture
 
-- Frontend: Cloudflare Pages static management UI
+- Frontend: Next.js application deployed separately from the API
 - API: Cloudflare Workers
 - Queue: Cloudflare Queues
 - Auth: Supabase Auth

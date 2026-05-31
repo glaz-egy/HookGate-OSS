@@ -6,26 +6,25 @@ This repository is the OSS implementation track. Billing, Stripe, plan enforceme
 
 ## Current Scope
 
-- Cloudflare Workers API for `POST /api/v1/hooks/:endpoint_id`
+- Next.js frontend under `apps/web`
+- Cloudflare Workers API under `apps/api` for `POST /api/v1/hooks/:endpoint_id`
 - Cloudflare Queues producer and consumer
+- Supabase Auth protected management console
 - Discord and Slack outgoing webhook adapters
 - API key lookup with hashed key verification
 - Payload validation, size limits, idempotency checks, and basic rate limiting hooks
 - Secret-safe logging helpers
-- Static Cloudflare Pages compatible management UI shell
+- Next.js management UI shell with Supabase Auth
 - Supabase PostgreSQL schema with RLS enabled
 - Documentation under `Docs/`
 
 ## Repository Layout
 
 ```text
-Docs/                  Requirements and implementation tracking
-public/                Static management UI shell
-src/adapters/          Destination-specific payload adapters
-src/lib/               Shared validation, crypto, database, and security helpers
-src/worker/            Cloudflare Worker entrypoints
+apps/api/              Cloudflare Workers API and Queue consumer
+apps/web/              Next.js frontend with Supabase Auth
+Docs/                  Requirements, status, and local setup docs
 supabase/migrations/   Supabase schema migrations
-test/                  Node test suite
 ```
 
 ## Local Checks
@@ -35,7 +34,7 @@ npm test
 npm run check
 ```
 
-No install step is required for the current test suite.
+See `Docs/local-development.md` for local Supabase, Next.js, and Worker setup.
 
 ## Deployment Notes
 
@@ -46,8 +45,8 @@ No install step is required for the current test suite.
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `WEBHOOK_URL_ENCRYPTION_KEY`
 4. Bind the queue as `WEBHOOK_QUEUE`.
-5. Deploy `src/worker/index.js` as the API Worker and `src/worker/queue.js` as the queue consumer.
-6. Deploy `public/` with Cloudflare Pages for the management UI shell.
+5. Deploy `apps/api/src/worker/index.js` as the API Worker and `apps/api/src/worker/queue.js` as the queue consumer.
+6. Deploy `apps/web` as the Next.js frontend.
 
 ## Security Defaults
 

@@ -1,6 +1,12 @@
 node_modules/
+.next/
 .wrangler/
 .dev.vars
+.env.local
+.env*.local
+supabase/.branches/
+supabase/.temp/
 dist/
 coverage/
 *.log
+*.tsbuildinfo

@@ -12,4 +12,4 @@ For HookGate OSS, those commercial requirements are intentionally narrowed in `D
 - Organization is no longer a billing unit.
 - Usage tracking is retained only for observability and abuse prevention.
 - The initial destination scope remains Discord and Slack.
-- Cloudflare Workers, Cloudflare Queues, Cloudflare Pages, Supabase Auth, and Supabase PostgreSQL remain the target platform.
+- Cloudflare Workers, Cloudflare Queues, Supabase Auth, and Supabase PostgreSQL remain the target backend platform. The OSS frontend is now implemented with Next.js.
