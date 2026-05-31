@@ -29,6 +29,8 @@ Last updated: 2026-05-31
 - Endpoint-level query-string API key toggle in API and UI.
 - Audit-log writes for organization, project, endpoint, API key, and resend management operations.
 - Delivery log resend API and UI action.
+- Drizzle schema definitions for backend database tables.
+- Management DB access now uses a whitelisted REST query builder to avoid raw query-string composition from user input.
 
 ## Remaining Tasks
 

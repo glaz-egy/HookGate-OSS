@@ -177,6 +177,8 @@ Required controls:
 
 - API key hashing
 - Webhook URL encryption
+- Drizzle-backed table schema definitions in backend code
+- Whitelisted DB query construction for management API filters, columns, and operators
 - HTTPS-only destination URLs
 - Discord/Slack URL allowlisting in the initial release
 - Secret-safe logging

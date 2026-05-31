@@ -53,10 +53,11 @@ export async function handleManagement(request, env, ctx, db) {
 
 async function handleOrganizations(request, db, user, parts) {
   if (request.method === "GET" && parts.length === 1) {
-    const rows = await db.list(
-      "organization_members",
-      `user_id=eq.${encodeURIComponent(user.id)}&select=role,organizations(id,name,slug,is_enabled,created_at,updated_at)&order=created_at.desc`
-    );
+    const rows = await db.list("organization_members", {
+      select: "role,organizations(id,name,slug,is_enabled,created_at,updated_at)",
+      filters: [{ column: "user_id", operator: "eq", value: user.id }],
+      order: { column: "created_at", direction: "desc" }
+    });
     return jsonResponse({
       success: true,
       organizations: rows.map((row) => ({ ...row.organizations, role: row.role }))
@@ -120,10 +121,11 @@ async function handleProjects(request, db, user, parts, url) {
   if (request.method === "GET" && parts.length === 1) {
     const organizationId = requiredParam(url, "organization_id");
     await requireRole(db, organizationId, user.id, ["owner", "admin", "developer", "viewer"]);
-    const projects = await db.list(
-      "projects",
-      `organization_id=eq.${encodeURIComponent(organizationId)}&select=id,organization_id,name,slug,is_enabled,created_at,updated_at&order=created_at.desc`
-    );
+    const projects = await db.list("projects", {
+      select: "id,organization_id,name,slug,is_enabled,created_at,updated_at",
+      filters: [{ column: "organization_id", operator: "eq", value: organizationId }],
+      order: { column: "created_at", direction: "desc" }
+    });
     return jsonResponse({ success: true, projects });
   }
 
@@ -191,13 +193,15 @@ async function handleEndpoints(request, env, db, user, parts, url) {
     }
     await requireRole(db, orgId, user.id, ["owner", "admin", "developer", "viewer"]);
 
-    const filter = projectId
-      ? `project_id=eq.${encodeURIComponent(projectId)}`
-      : `organization_id=eq.${encodeURIComponent(orgId)}`;
-    const endpoints = await db.list(
-      "webhook_endpoints",
-      `${filter}&select=id,organization_id,project_id,name,service_type,is_enabled,timeout_seconds,retry_enabled,allow_query_api_key,rate_limit_per_minute,log_policy,created_at,updated_at&order=created_at.desc`
-    );
+    const endpoints = await db.list("webhook_endpoints", {
+      select: "id,organization_id,project_id,name,service_type,is_enabled,timeout_seconds,retry_enabled,allow_query_api_key,rate_limit_per_minute,log_policy,created_at,updated_at",
+      filters: [
+        projectId
+          ? { column: "project_id", operator: "eq", value: projectId }
+          : { column: "organization_id", operator: "eq", value: orgId }
+      ],
+      order: { column: "created_at", direction: "desc" }
+    });
     return jsonResponse({ success: true, endpoints });
   }
 
@@ -292,10 +296,11 @@ async function handleEndpoints(request, env, db, user, parts, url) {
 
   if (request.method === "GET" && parts[2] === "api-keys") {
     await requireRole(db, endpoint.organization_id, user.id, ["owner", "admin", "developer", "viewer"]);
-    const apiKeys = await db.list(
-      "webhook_api_keys",
-      `endpoint_id=eq.${encodeURIComponent(endpointId)}&select=id,endpoint_id,is_active,last_used_at,last_used_ip,use_count,created_at,revoked_at&order=created_at.desc`
-    );
+    const apiKeys = await db.list("webhook_api_keys", {
+      select: "id,endpoint_id,is_active,last_used_at,last_used_ip,use_count,created_at,revoked_at",
+      filters: [{ column: "endpoint_id", operator: "eq", value: endpointId }],
+      order: { column: "created_at", direction: "desc" }
+    });
     return jsonResponse({ success: true, api_keys: apiKeys });
   }
 
@@ -308,10 +313,11 @@ async function handleApiKeys(request, db, user, parts) {
     return errorResponse(404, "ENDPOINT_NOT_FOUND", "API key endpoint not found.");
   }
 
-  const rows = await db.list(
-    "webhook_api_keys",
-    `id=eq.${encodeURIComponent(apiKeyId)}&select=id,endpoint_id,is_active,webhook_endpoints(id,organization_id)&limit=1`
-  );
+  const rows = await db.list("webhook_api_keys", {
+    select: "id,endpoint_id,is_active,webhook_endpoints(id,organization_id)",
+    filters: [{ column: "id", operator: "eq", value: apiKeyId }],
+    limit: 1
+  });
   const apiKey = rows[0];
   if (!apiKey) {
     return errorResponse(404, "ENDPOINT_NOT_FOUND", "API key not found.");
@@ -352,10 +358,12 @@ async function handleLogs(request, env, ctx, db, user, parts, url) {
   if (request.method === "GET" && parts.length === 1) {
     const organizationId = requiredParam(url, "organization_id");
     await requireRole(db, organizationId, user.id, ["owner", "admin", "developer", "viewer"]);
-    const logs = await db.list(
-      "webhook_logs",
-      `organization_id=eq.${encodeURIComponent(organizationId)}&select=id,request_id,organization_id,project_id,endpoint_id,status,service_type,http_status,retry_count,source_ip,request_summary,response_summary,error_message,queued_at,sent_at,completed_at,duration_ms,created_at&order=created_at.desc&limit=50`
-    );
+    const logs = await db.list("webhook_logs", {
+      select: "id,request_id,organization_id,project_id,endpoint_id,status,service_type,http_status,retry_count,source_ip,request_summary,response_summary,error_message,queued_at,sent_at,completed_at,duration_ms,created_at",
+      filters: [{ column: "organization_id", operator: "eq", value: organizationId }],
+      order: { column: "created_at", direction: "desc" },
+      limit: 50
+    });
     return jsonResponse({ success: true, logs });
   }
 
@@ -481,10 +489,11 @@ async function audit(db, request, user, organizationId, action, targetType, targ
 }
 
 async function getOrganization(db, organizationId) {
-  const rows = await db.list(
-    "organizations",
-    `id=eq.${encodeURIComponent(organizationId)}&select=id,name,slug,is_enabled,created_at,updated_at&limit=1`
-  );
+  const rows = await db.list("organizations", {
+    select: "id,name,slug,is_enabled,created_at,updated_at",
+    filters: [{ column: "id", operator: "eq", value: organizationId }],
+    limit: 1
+  });
   return rows[0] || null;
 }
 

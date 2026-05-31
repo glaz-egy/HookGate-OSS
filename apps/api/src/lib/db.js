@@ -1,3 +1,5 @@
+import { buildRestPath, assertTable } from "./rest-query.js";
+
 export function createSupabaseClient(env) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("Supabase environment variables are not configured.");
@@ -47,11 +49,12 @@ export function createSupabaseClient(env) {
       return response.json();
     },
 
-    async list(table, query = "select=*") {
-      return request(`${table}?${query}`);
+    async list(table, options = {}) {
+      return request(buildRestPath(table, options));
     },
 
     async insert(table, values) {
+      assertTable(table);
       const rows = await request(table, {
         method: "POST",
         headers: { prefer: "return=representation" },
@@ -61,7 +64,9 @@ export function createSupabaseClient(env) {
     },
 
     async patch(table, id, values) {
-      const rows = await request(`${table}?id=eq.${encodeURIComponent(id)}`, {
+      const rows = await request(buildRestPath(table, {
+        filters: [{ column: "id", operator: "eq", value: id }]
+      }), {
         method: "PATCH",
         headers: { prefer: "return=representation" },
         body: JSON.stringify(values)
@@ -70,16 +75,23 @@ export function createSupabaseClient(env) {
     },
 
     async remove(table, id) {
-      return request(`${table}?id=eq.${encodeURIComponent(id)}`, {
+      return request(buildRestPath(table, {
+        filters: [{ column: "id", operator: "eq", value: id }]
+      }), {
         method: "DELETE",
         headers: { prefer: "return=minimal" }
       });
     },
 
     async getOrganizationRole(organizationId, userId) {
-      const rows = await request(
-        `organization_members?organization_id=eq.${encodeURIComponent(organizationId)}&user_id=eq.${encodeURIComponent(userId)}&select=role&limit=1`
-      );
+      const rows = await this.list("organization_members", {
+        select: "role",
+        filters: [
+          { column: "organization_id", operator: "eq", value: organizationId },
+          { column: "user_id", operator: "eq", value: userId }
+        ],
+        limit: 1
+      });
       return rows[0]?.role || null;
     },
 
@@ -88,28 +100,39 @@ export function createSupabaseClient(env) {
     },
 
     async getProject(projectId) {
-      const rows = await request(
-        `projects?id=eq.${encodeURIComponent(projectId)}&select=id,organization_id,name,slug,is_enabled&limit=1`
-      );
+      const rows = await this.list("projects", {
+        select: "id,organization_id,name,slug,is_enabled",
+        filters: [{ column: "id", operator: "eq", value: projectId }],
+        limit: 1
+      });
       return rows[0] || null;
     },
 
     async getEndpoint(endpointId) {
-      const rows = await request(
-        `webhook_endpoints?id=eq.${encodeURIComponent(endpointId)}&select=id,organization_id,project_id,name,service_type,webhook_url_ciphertext,is_enabled,timeout_seconds,retry_enabled,allow_query_api_key,rate_limit_per_minute`
-      );
+      const rows = await this.list("webhook_endpoints", {
+        select: "id,organization_id,project_id,name,service_type,webhook_url_ciphertext,is_enabled,timeout_seconds,retry_enabled,allow_query_api_key,rate_limit_per_minute",
+        filters: [{ column: "id", operator: "eq", value: endpointId }],
+        limit: 1
+      });
       return rows[0] || null;
     },
 
     async getActiveApiKey(endpointId) {
-      const rows = await request(
-        `webhook_api_keys?endpoint_id=eq.${encodeURIComponent(endpointId)}&is_active=eq.true&select=id,api_key_hash,use_count`
-      );
+      const rows = await this.list("webhook_api_keys", {
+        select: "id,api_key_hash,use_count",
+        filters: [
+          { column: "endpoint_id", operator: "eq", value: endpointId },
+          { column: "is_active", operator: "eq", value: true }
+        ],
+        limit: 1
+      });
       return rows[0] || null;
     },
 
     async updateApiKeyUsage(keyId, ipAddress) {
-      return request(`webhook_api_keys?id=eq.${encodeURIComponent(keyId)}`, {
+      return request(buildRestPath("webhook_api_keys", {
+        filters: [{ column: "id", operator: "eq", value: keyId }]
+      }), {
         method: "PATCH",
         headers: { prefer: "return=minimal" },
         body: JSON.stringify({
@@ -133,7 +156,12 @@ export function createSupabaseClient(env) {
     },
 
     async deactivateApiKeys(endpointId, userId) {
-      return request(`webhook_api_keys?endpoint_id=eq.${encodeURIComponent(endpointId)}&is_active=eq.true`, {
+      return request(buildRestPath("webhook_api_keys", {
+        filters: [
+          { column: "endpoint_id", operator: "eq", value: endpointId },
+          { column: "is_active", operator: "eq", value: true }
+        ]
+      }), {
         method: "PATCH",
         headers: { prefer: "return=minimal" },
         body: JSON.stringify({
@@ -145,7 +173,9 @@ export function createSupabaseClient(env) {
     },
 
     async updateDeliveryLog(requestId, patch) {
-      return request(`webhook_logs?request_id=eq.${encodeURIComponent(requestId)}`, {
+      return request(buildRestPath("webhook_logs", {
+        filters: [{ column: "request_id", operator: "eq", value: requestId }]
+      }), {
         method: "PATCH",
         headers: { prefer: "return=minimal" },
         body: JSON.stringify(patch)
@@ -156,16 +186,24 @@ export function createSupabaseClient(env) {
       if (!idempotencyKey) {
         return null;
       }
-      const rows = await request(
-        `webhook_logs?endpoint_id=eq.${encodeURIComponent(endpointId)}&idempotency_key=eq.${encodeURIComponent(idempotencyKey)}&created_at=gte.${encodeURIComponent(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())}&select=request_id,status&limit=1`
-      );
+      const rows = await this.list("webhook_logs", {
+        select: "request_id,status",
+        filters: [
+          { column: "endpoint_id", operator: "eq", value: endpointId },
+          { column: "idempotency_key", operator: "eq", value: idempotencyKey },
+          { column: "created_at", operator: "gte", value: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }
+        ],
+        limit: 1
+      });
       return rows[0] || null;
     },
 
     async getDeliveryLog(requestId) {
-      const rows = await request(
-        `webhook_logs?request_id=eq.${encodeURIComponent(requestId)}&select=*&limit=1`
-      );
+      const rows = await this.list("webhook_logs", {
+        select: "*",
+        filters: [{ column: "request_id", operator: "eq", value: requestId }],
+        limit: 1
+      });
       return rows[0] || null;
     }
   };
