@@ -393,9 +393,18 @@ td code {
 }
 
 .endpoint-form {
-  grid-template-columns: minmax(160px, 1fr) 140px minmax(260px, 2fr) 100px 120px repeat(3, auto) auto;
+  grid-template-columns: minmax(170px, 1.2fr) 130px minmax(220px, 2fr) 90px 105px;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.endpoint-form .check-row {
+  align-self: center;
+}
+
+.endpoint-form button[type="submit"] {
+  grid-column: 4 / -1;
+  justify-self: stretch;
 }
 
 .endpoint-list,
@@ -412,8 +421,12 @@ td code {
 }
 
 .endpoint-edit {
-  grid-template-columns: minmax(160px, 1fr) 80px minmax(220px, 1.4fr) 90px 110px repeat(3, auto);
+  grid-template-columns: minmax(180px, 1fr) 80px minmax(220px, 1.5fr) 90px 105px;
   align-items: center;
+}
+
+.endpoint-edit .button-row {
+  grid-column: 1 / -1;
 }
 
 .key-list {
@@ -456,6 +469,28 @@ td code {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.id-chip {
+  min-height: 32px;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.id-chip code {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
 }
 
 .button-row button,
@@ -527,5 +562,10 @@ button.danger:disabled:hover {
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .endpoint-form button[type="submit"],
+  .endpoint-edit .button-row {
+    grid-column: 1 / -1;
   }
 }

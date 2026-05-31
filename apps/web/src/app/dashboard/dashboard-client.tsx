@@ -82,6 +82,7 @@ export function DashboardClient() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [plainApiKey, setPlainApiKey] = useState("");
+  const [plainApiKeyEndpointId, setPlainApiKeyEndpointId] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const selectedOrg = data.organizations.find((organization) => organization.id === selectedOrgId);
@@ -278,6 +279,7 @@ export function DashboardClient() {
         body: JSON.stringify({})
       });
       setPlainApiKey(result.api_key.plaintext || "");
+      setPlainApiKeyEndpointId(endpoint.id);
       await refresh(selectedOrgId, selectedProjectId);
     }, "API key created. Copy it now; it will not be shown again.");
   }
@@ -325,15 +327,6 @@ export function DashboardClient() {
 
       {message ? <p className="status">{message}</p> : null}
       {error ? <p className="status error">{error}</p> : null}
-      {plainApiKey ? (
-        <div className="status secret-box">
-          <strong>New API key, shown once:</strong>
-          <code>{plainApiKey}</code>
-          <button type="button" className="secondary" onClick={() => setPlainApiKey("")}>
-            Hide
-          </button>
-        </div>
-      ) : null}
 
       <section className="metrics" aria-label="Delivery metrics">
         <article>
@@ -492,7 +485,12 @@ export function DashboardClient() {
                     <input type="checkbox" name="allow_query_api_key" defaultChecked={endpoint.allow_query_api_key} />
                     Query API key
                   </label>
+
                   <div className="button-row">
+                    <span className="id-chip">
+                      <span>Endpoint ID</span>
+                      <code>{endpoint.id}</code>
+                    </span>
                     <button type="submit" disabled={isPending}>Save</button>
                     <button type="button" className="secondary" onClick={() => createApiKey(endpoint)} disabled={isPending}>
                       New API key
@@ -502,6 +500,23 @@ export function DashboardClient() {
                     </button>
                   </div>
                 </form>
+
+                {plainApiKey && plainApiKeyEndpointId === endpoint.id ? (
+                  <div className="status secret-box">
+                    <strong>New API key, shown once:</strong>
+                    <code>{plainApiKey}</code>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setPlainApiKey("");
+                        setPlainApiKeyEndpointId("");
+                      }}
+                    >
+                      Hide
+                    </button>
+                  </div>
+                ) : null}
                 <div className="key-list">
                   {(data.apiKeys[endpoint.id] || []).map((apiKey) => (
                     <div key={apiKey.id} className="key-row">

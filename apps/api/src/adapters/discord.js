@@ -8,39 +8,37 @@ const LEVEL_COLORS = {
 };
 
 export function toDiscordPayload(message) {
-  const embed = {
-    title: truncate(message.title, 256),
-    description: truncate(message.message, 4096),
-    color: parseColor(message.color) || LEVEL_COLORS[message.level] || LEVEL_COLORS.info,
-    timestamp: new Date().toISOString()
-  };
-
-  if (message.url) {
-    embed.url = message.url;
+  if (message.embeds?.length) {
+    return removeUndefined({
+      content: truncate(message.content || buildMentions(message.mentions), 2000),
+      embeds: message.embeds.slice(0, 10).map(normalizeEmbed),
+      username: message.username ? truncate(message.username, 80) : undefined,
+      avatar_url: message.icon_url
+    });
   }
 
-  if (message.fields?.length) {
-    embed.fields = message.fields.slice(0, 25).map((field) => ({
-      name: truncate(field.name, 256),
-      value: truncate(field.value, 1024),
-      inline: Boolean(field.inline)
-    }));
+  if (message.title || message.fields?.length || message.url || message.color) {
+    const embed = normalizeEmbed({
+      title: message.title,
+      description: message.message,
+      color: message.color,
+      fields: message.fields,
+      url: message.url
+    }, message.level);
+
+    return removeUndefined({
+      content: buildMentions(message.mentions),
+      embeds: [embed],
+      username: message.username ? truncate(message.username, 80) : undefined,
+      avatar_url: message.icon_url
+    });
   }
 
-  const payload = {
-    content: buildMentions(message.mentions),
-    embeds: [removeUndefined(embed)]
-  };
-
-  if (message.username) {
-    payload.username = truncate(message.username, 80);
-  }
-
-  if (message.icon_url) {
-    payload.avatar_url = message.icon_url;
-  }
-
-  return removeUndefined(payload);
+  return removeUndefined({
+    content: truncate(message.content || message.message, 2000),
+    username: message.username ? truncate(message.username, 80) : undefined,
+    avatar_url: message.icon_url
+  });
 }
 
 function buildMentions(mentions = []) {
@@ -55,6 +53,21 @@ function parseColor(color) {
     return Number.parseInt(color.replace("#", ""), 16);
   }
   return undefined;
+}
+
+function normalizeEmbed(embed, level = "info") {
+  return removeUndefined({
+    title: truncate(embed.title, 256),
+    description: truncate(embed.description, 4096),
+    color: parseColor(embed.color) || LEVEL_COLORS[level] || LEVEL_COLORS.info,
+    timestamp: embed.timestamp || new Date().toISOString(),
+    url: embed.url,
+    fields: embed.fields?.slice(0, 25).map((field) => ({
+      name: truncate(field.name, 256),
+      value: truncate(field.value, 1024),
+      inline: Boolean(field.inline)
+    }))
+  });
 }
 
 function truncate(value, max) {

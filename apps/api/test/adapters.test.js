@@ -27,3 +27,31 @@ test("slack adapter creates block payload", () => {
   assert.equal(payload.blocks[0].type, "header");
   assert.equal(payload.blocks[1].type, "section");
 });
+
+test("discord adapter accepts plain content payload", () => {
+  const payload = toDiscordPayload({
+    message: "plain Discord text",
+    content: "plain Discord text",
+    level: "info",
+    fields: [],
+    metadata: {},
+    mentions: [],
+    attachments: []
+  });
+  assert.equal(payload.content, "plain Discord text");
+  assert.equal(payload.embeds, undefined);
+});
+
+test("discord adapter accepts native embeds payload", () => {
+  const payload = toDiscordPayload({
+    message: "Something happened",
+    embeds: [{ title: "Alert", description: "Something happened" }],
+    level: "info",
+    fields: [],
+    metadata: {},
+    mentions: [],
+    attachments: []
+  });
+  assert.equal(payload.embeds[0].title, "Alert");
+  assert.equal(payload.embeds[0].description, "Something happened");
+});

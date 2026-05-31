@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type FormEvent, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -11,43 +11,51 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [message, setMessage] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setMessage("");
+    setIsSubmitting(true);
+    const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") || "");
     const password = String(formData.get("password") || "");
     const supabase = createClient();
 
-    const result =
-      mode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              emailRedirectTo: `${window.location.origin}/auth/callback`
-            }
-          });
+    try {
+      const result =
+        mode === "sign-in"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({
+              email,
+              password,
+              options: {
+                emailRedirectTo: `${window.location.origin}/auth/callback`
+              }
+            });
 
-    if (result.error) {
-      setMessage(result.error.message);
-      return;
+      if (result.error) {
+        setMessage(result.error.message);
+        return;
+      }
+
+      if (mode === "sign-up" && !result.data.session) {
+        setMessage("Check your email to confirm the account, then sign in.");
+        return;
+      }
+
+      startTransition(() => {
+        router.push(searchParams.get("next") || "/dashboard");
+        router.refresh();
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (mode === "sign-up" && !result.data.session) {
-      setMessage("Check your email to confirm the account, then sign in.");
-      return;
-    }
-
-    startTransition(() => {
-      router.push(searchParams.get("next") || "/dashboard");
-      router.refresh();
-    });
   }
 
   return (
-    <form className="auth-form" action={handleSubmit}>
+    <form className="auth-form" onSubmit={handleSubmit}>
       <div className="field">
         <label htmlFor="email">Email</label>
         <input id="email" name="email" type="email" autoComplete="email" required />
@@ -59,8 +67,8 @@ export function LoginForm() {
 
       {message ? <p className={`status ${message.includes("Check your email") ? "" : "error"}`}>{message}</p> : null}
 
-      <button className="primary" type="submit" disabled={isPending}>
-        {isPending ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
+      <button className="primary" type="submit" disabled={isSubmitting || isPending}>
+        {isSubmitting || isPending ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
       </button>
 
       <button

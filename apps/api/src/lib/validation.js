@@ -31,11 +31,22 @@ export function validateIncomingPayload(payload) {
     return invalid("payload must be a JSON object.");
   }
 
-  if (typeof payload.message !== "string" || payload.message.trim().length === 0) {
-    return invalid("message is required.");
+  const messageText = getMessageText(payload);
+  const hasMessage = typeof messageText === "string" && messageText.trim().length > 0;
+  const hasEmbeds = payload.embeds !== undefined;
+
+  if (!hasMessage && !hasEmbeds) {
+    return invalid("message, content, or embeds is required.");
   }
 
-  if (payload.message.length > LIMITS.messageChars) {
+  if (hasEmbeds) {
+    const validResult = validateEmbeds(payload.embeds);
+    if (validResult !== undefined) {
+      return validResult;
+    }
+  }
+
+  if (hasMessage && messageText.length > LIMITS.messageChars) {
     return invalid("message exceeds 4000 characters.");
   }
 
@@ -79,14 +90,44 @@ export function validateIncomingPayload(payload) {
 
   return {
     ok: true,
-    value: normalizePayload(payload)
+    value: normalizePayload(payload, messageText)
   };
 }
 
-function normalizePayload(payload) {
+function validateEmbeds(embeds) {
+  if (!Array.isArray(embeds) || embeds.length === 0) {
+    return invalid("embeds must be a non-empty array.");
+  }
+
+  if (embeds.length > 10) {
+    return invalid("embeds must contain up to 10 entries.");
+  }
+
+  for (const embed of embeds) {
+    if (!embed || typeof embed !== "object" || Array.isArray(embed)) {
+      return invalid("each embed must be an object.");
+    }
+    if (embed.title !== undefined && (typeof embed.title !== "string" || embed.title.length > LIMITS.titleChars)) {
+      return invalid("embed title must be a string up to 256 characters.");
+    }
+    if (embed.description !== undefined && typeof embed.description !== "string") {
+      return invalid("embed description must be a string.");
+    }
+    if (!embed.title && !embed.description) {
+      return invalid("each embed requires title or description.");
+    }
+  }
+
+  return undefined;
+}
+
+function normalizePayload(payload, messageText) {
+  const message = deriveMessage(payload, messageText);
   return {
-    title: payload.title || undefined,
-    message: payload.message.trim(),
+    title: payload.title || payload.embeds?.[0]?.title || undefined,
+    content: typeof payload.content === "string" ? payload.content.trim() : undefined,
+    embeds: payload.embeds || undefined,
+    message,
     level: payload.level ? String(payload.level).toLowerCase() : "info",
     fields: payload.fields || [],
     url: payload.url || undefined,
@@ -99,6 +140,24 @@ function normalizePayload(payload) {
     template_id: payload.template_id || undefined,
     idempotency_key: payload.idempotency_key || undefined
   };
+}
+
+function getMessageText(payload) {
+  if (typeof payload.message === "string") {
+    return payload.message;
+  }
+  if (typeof payload.content === "string") {
+    return payload.content;
+  }
+  return undefined;
+}
+
+function deriveMessage(payload, messageText) {
+  if (typeof messageText === "string" && messageText.trim().length > 0) {
+    return messageText.trim();
+  }
+  const firstEmbed = payload.embeds?.[0];
+  return String(firstEmbed?.description || firstEmbed?.title || "").trim();
 }
 
 function invalid(message) {
