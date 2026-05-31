@@ -50,18 +50,16 @@ Required GitHub `production` environment secrets for Cloudflare deployment:
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `WEBHOOK_URL_ENCRYPTION_KEY`
 
-Required GitHub `production` environment variables for Cloudflare deployment:
+Required GitHub `production` environment secret or variable for the Web build:
 
-- `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-- `NEXT_PUBLIC_HOOKGATE_API_URL`
 
-The workflow uses the GitHub `production` environment, creates the `hookgate-deliveries` queue if needed, uploads API Worker secrets from production environment secrets, then deploys `hookgate-oss-api` and `hookgate-oss-web`. If any required production environment secret or variable is missing, the workflow fails before mutating Cloudflare state.
+The workflow uses the GitHub `production` environment, reads Worker names and the queue name from `apps/api/wrangler.toml` and `apps/web/wrangler.jsonc`, creates the queue if needed, uploads API Worker secrets from production environment secrets, then deploys the API and Web Workers. Web Worker public variables are generated during CI: `NEXT_PUBLIC_SUPABASE_URL` comes from `SUPABASE_URL`, and `NEXT_PUBLIC_HOOKGATE_API_URL` is derived from the API Worker name and the Cloudflare workers.dev subdomain. If any required production environment secret or variable is missing, the workflow fails before mutating Cloudflare state.
 
 ## Deployment Notes
 
 1. Create a Supabase project and apply all SQL files under `supabase/migrations`.
-2. Configure GitHub `production` environment secrets and variables for Cloudflare deployment.
+2. Configure GitHub `production` environment secrets for Cloudflare deployment and provide `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as either a secret or variable.
 3. Configure Worker environment variables:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`

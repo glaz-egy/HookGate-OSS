@@ -12,6 +12,21 @@ export function createSupabaseClient(env) {
     "content-type": "application/json"
   };
 
+  async function readJsonResponse(response, context) {
+    const text = await response.text();
+    if (!text.trim()) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      const contentType = response.headers.get("content-type") || "unknown content type";
+      const preview = text.replace(/\s+/g, " ").trim().slice(0, 160);
+      throw new Error(`${context} returned invalid JSON (${response.status}, ${contentType}). Body starts with: ${preview}`);
+    }
+  }
+
   async function request(path, init = {}) {
     const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
       ...init,
@@ -29,7 +44,7 @@ export function createSupabaseClient(env) {
     if (response.status === 204) {
       return null;
     }
-    return response.json();
+    return readJsonResponse(response, "Supabase REST request");
   }
 
   return {
@@ -46,7 +61,7 @@ export function createSupabaseClient(env) {
       if (!response.ok) {
         return null;
       }
-      return response.json();
+      return readJsonResponse(response, "Supabase auth request");
     },
 
     async list(table, options = {}) {
